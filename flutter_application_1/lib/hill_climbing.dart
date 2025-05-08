@@ -1,11 +1,15 @@
 class HillClimbingGraph {
-  int n;
-  List<List<List<int>>> adj;
+  final int n;
+  final List<List<List<int>>> adj;
   List<bool> visited = [];
-  List<String> steps = []; // Sửa thành List<String>
+  List<String> steps = [];
 
   HillClimbingGraph(this.n, List<List<int>> edges)
     : adj = List.generate(n, (_) => []) {
+    _buildGraph(edges);
+  }
+
+  void _buildGraph(List<List<int>> edges) {
     for (var edge in edges) {
       int u = edge[0], v = edge[1], cost = edge[2];
       adj[u].add([v, cost]);
@@ -13,49 +17,56 @@ class HillClimbingGraph {
     }
   }
 
+  void _logStep(int step, String message) {
+    steps.add("--- Bước $step ---\n$message");
+  }
+
   List<int> hillClimbing(int src, int target) {
     visited = List.filled(n, false);
     steps.clear();
     List<int> path = [];
     int step = 1;
-
     int current = src;
     path.add(current);
     visited[current] = true;
 
     while (true) {
-      String log = "--- Bước $step ---\n";
-      log += "Đang xét đỉnh: $current\n";
+      StringBuffer log = StringBuffer("Đang xét đỉnh: $current\n");
 
       if (current == target) {
-        log += "Đã đến đích!";
-        steps.add(log); // Sửa thành steps.add(log)
+        log.write("Đã đến đích!");
+        _logStep(step, log.toString());
         break;
       }
 
-      List<List<int>> neighbors = [];
-
-      for (var neighborInfo in adj[current]) {
-        int neighbor = neighborInfo[0];
-        int cost = neighborInfo[1];
-        if (!visited[neighbor]) {
-          neighbors.add([cost, neighbor]);
-        }
-      }
+      List<List<int>> neighbors = _getUnvisitedNeighbors(current);
 
       if (neighbors.isEmpty) {
-        log +=
-            "Không còn lựa chọn tốt hơn -> Dừng lại (local maximum hoặc dead end)";
-        steps.add(log); // Sửa thành steps.add(log)
+        log.write(
+          "Không còn lựa chọn tốt hơn -> Dừng lại (local maximum hoặc dead end)",
+        );
+        _logStep(step, log.toString());
         break;
+      }
+
+      log.write("Các đỉnh kề chưa duyệt:\n");
+      for (var n in neighbors) {
+        log.write("  - Đỉnh ${n[1]} với cost = ${n[0]}\n");
       }
 
       neighbors.sort((a, b) => a[0].compareTo(b[0]));
-      int nextCost = neighbors[0][0];
-      int nextNode = neighbors[0][1];
 
-      log += "Chọn đỉnh $nextNode có cost nhỏ nhất = $nextCost\n";
-      steps.add(log); // Sửa thành steps.add(log)
+      log.write("Sau khi sắp xếp theo cost tăng dần:\n");
+      for (var n in neighbors) {
+        log.write("  - Đỉnh ${n[1]} với cost = ${n[0]}\n");
+      }
+
+      int nextNode = neighbors[0][1];
+      int nextCost = neighbors[0][0];
+
+      log.write("Chọn đỉnh $nextNode có cost nhỏ nhất = $nextCost");
+
+      _logStep(step, log.toString());
 
       current = nextNode;
       path.add(current);
@@ -64,5 +75,17 @@ class HillClimbingGraph {
     }
 
     return path;
+  }
+
+  List<List<int>> _getUnvisitedNeighbors(int current) {
+    List<List<int>> neighbors = [];
+    for (var neighborInfo in adj[current]) {
+      int neighbor = neighborInfo[0];
+      int cost = neighborInfo[1];
+      if (!visited[neighbor]) {
+        neighbors.add([cost, neighbor]);
+      }
+    }
+    return neighbors;
   }
 }

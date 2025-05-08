@@ -1,63 +1,79 @@
 import 'package:collection/collection.dart';
 
 class BestFirstGraph {
-  int n;
-  List<List<List<int>>> adj;
-  List<bool> visited = [];
-  List<String> steps = []; // Sửa thành List<String>
-  PriorityQueue<List<int>> pq;
+  final int n;
+  final List<List<List<int>>> adj; // Danh sách kề
+  final PriorityQueue<List<int>> pq; // Hàng đợi ưu tiên
+  List<bool> visited; // Danh sách các đỉnh đã duyệt
+  List<String> steps; // Các bước thực hiện
 
   BestFirstGraph(this.n, List<List<int>> edges)
     : adj = List.generate(n, (_) => []),
-      pq = PriorityQueue<List<int>>((a, b) => a[0].compareTo(b[0])) {
+      pq = PriorityQueue<List<int>>(
+        (a, b) => a[0].compareTo(b[0]),
+      ), // Ưu tiên theo chi phí nhỏ nhất
+      visited = List.filled(n, false),
+      steps = [] {
+    _buildGraph(edges); // Xây dựng đồ thị từ danh sách cạnh
+  }
+
+  // Xây dựng đồ thị từ các cạnh
+  void _buildGraph(List<List<int>> edges) {
     for (var edge in edges) {
       int u = edge[0], v = edge[1], cost = edge[2];
       adj[u].add([v, cost]);
-      adj[v].add([u, cost]);
+      adj[v].add([u, cost]); // Đồ thị vô hướng
     }
   }
 
-  List<int> bestFirstSearch(int src, int target) {
+  // Làm mới lại tất cả các trạng thái
+  void _reset() {
     visited = List.filled(n, false);
     pq.clear();
     steps.clear();
+  }
+
+  // Tìm kiếm Best-First từ đỉnh src đến target
+  List<int> bestFirstSearch(int src, int target) {
+    _reset(); // Đặt lại các trạng thái ban đầu
+
+    pq.add([0, src]); // Thêm đỉnh bắt đầu vào hàng đợi ưu tiên
+    visited[src] = true;
     List<int> path = [];
     int step = 1;
 
-    pq.add([0, src]);
-    visited[src] = true;
-
     while (pq.isNotEmpty) {
-      var current = pq.removeFirst();
+      var current = pq.removeFirst(); // Lấy đỉnh có chi phí nhỏ nhất
       int cost = current[0], node = current[1];
       path.add(node);
 
-      String log = "--- Bước $step ---\n";
-      log += "Đang xét đỉnh: $node (cost: $cost)\n";
+      // Ghi log cho bước hiện tại
+      StringBuffer log = StringBuffer("--- Bước $step ---\n");
+      log.write("Đang xét đỉnh: $node (cost: $cost)\n");
 
+      // Nếu đã đến đích, dừng thuật toán
       if (node == target) {
-        log += "Đã đến đích!";
-        steps.add(log); // Sửa thành steps.add(log)
+        log.write("Đã đến đích!\n");
+        steps.add(log.toString()); // Thêm log vào steps
         break;
       }
 
-      log += "Các đỉnh kề (chưa duyệt):\n";
-      for (var neighborInfo in adj[node]) {
-        int neighbor = neighborInfo[0];
-        int edgeCost = neighborInfo[1];
-        if (!visited[neighbor]) {
-          visited[neighbor] = true;
-          pq.add([edgeCost, neighbor]);
-          log += "  - Đỉnh $neighbor với cost = $edgeCost\n";
+      log.write("Các đỉnh kề chưa duyệt:\n");
+      for (var neighbor in adj[node]) {
+        int neighborNode = neighbor[0];
+        int edgeCost = neighbor[1];
+        if (!visited[neighborNode]) {
+          visited[neighborNode] = true;
+          pq.add([edgeCost, neighborNode]); // Thêm đỉnh kề vào hàng đợi
+          log.write("  - Đỉnh $neighborNode với cost = $edgeCost\n");
         }
       }
 
-      var openList = pq.toList()..sort((a, b) => a[0].compareTo(b[0]));
-      log += "Danh sách mở: $openList\n";
-      steps.add(log); // Sửa thành steps.add(log)
+      log.write("Danh sách mở: ${pq.toList()}\n"); // Ghi danh sách mở
+      steps.add(log.toString()); // Thêm log vào steps
       step++;
     }
 
-    return path;
+    return path; // Trả về đường đi
   }
 }

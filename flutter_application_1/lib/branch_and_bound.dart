@@ -8,64 +8,78 @@ class BranchAndBoundGraph {
 
   BranchAndBoundGraph(this.n, List<List<int>> edges)
     : adj = List.generate(n, (_) => []) {
+    _buildGraph(edges);
+  }
+
+  void _buildGraph(List<List<int>> edges) {
     for (var edge in edges) {
       int u = edge[0], v = edge[1], cost = edge[2];
       adj[u].add([v, cost]);
-      adj[v].add([u, cost]);
+      adj[v].add([u, cost]); // Đồ thị vô hướng
     }
+  }
+
+  void _logStep(int step, String message) {
+    steps.add('--- Bước $step ---\n$message');
   }
 
   List<int> branchAndBound(int src, int target) {
     visited = List.filled(n, false);
     steps.clear();
-    List<int> path = [];
+    List<int> optimalPath = [];
     int step = 1;
 
-    // PriorityQueue to store paths with their costs
-    PriorityQueue<List<dynamic>> pq = PriorityQueue<List<dynamic>>(
-      (a, b) => a[0].compareTo(b[0]),
-    ); // Compare by cost
-    pq.add([
-      0,
-      [src],
-    ]); // Initial path with cost 0
+    // Ưu tiên đường đi có tổng cost nhỏ nhất
+    final pq = PriorityQueue<MapEntry<int, List<int>>>(
+      (a, b) => a.key.compareTo(b.key),
+    );
+    pq.add(MapEntry(0, [src]));
 
     while (pq.isNotEmpty) {
-      var current = pq.removeFirst();
-      int cost = current[0];
-      List<int> currentPath = current[1];
-      int node = currentPath.last;
+      final entry = pq.removeFirst();
+      final cost = entry.key;
+      final path = entry.value;
+      final node = path.last;
 
-      String log = "--- Bước $step ---\n";
-      log += "Đang xét đường đi: $currentPath (cost: $cost)\n";
+      String log = "Đang xét đường đi: $path (cost: $cost)\n";
 
       if (node == target) {
         log += "Đã đến đích với đường đi tối ưu!";
-        steps.add(log);
-        path = currentPath;
+        _logStep(step, log);
+        optimalPath = path;
         break;
       }
 
       if (!visited[node]) {
         visited[node] = true;
-
         log += "Các đỉnh kề (chưa duyệt):\n";
+
         for (var neighbor in adj[node]) {
           int neighborNode = neighbor[0];
           int edgeCost = neighbor[1];
+
           if (!visited[neighborNode]) {
-            List<int> newPath = List.from(currentPath)..add(neighborNode);
-            pq.add([cost + edgeCost, newPath]);
+            final newPath = List<int>.from(path)..add(neighborNode);
+            final newCost = cost + edgeCost;
+            pq.add(MapEntry(newCost, newPath));
             log +=
-                "  - Đỉnh $neighborNode với cost = ${cost + edgeCost}, đường đi: $newPath\n";
+                "  - Đỉnh $neighborNode (cost: $newCost), đường đi: $newPath\n";
           }
         }
       }
 
-      steps.add(log);
+      // Ghi lại trạng thái của danh sách mở sau mỗi bước
+      String openListLog = "Danh sách mở: ";
+      openListLog += pq
+          .toList()
+          .map((entry) => "[cost: ${entry.key}, path: ${entry.value}]")
+          .join(", ");
+      log += openListLog;
+
+      _logStep(step, log);
       step++;
     }
 
-    return path;
+    return optimalPath;
   }
 }

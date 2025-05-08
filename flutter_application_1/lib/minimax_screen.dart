@@ -1,201 +1,240 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
-void main() {
-  runApp(
-    MaterialApp(
-      title: 'Minimax Algorithm - Pacman vs Ghost',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: MinimaxScreen(),
-    ),
-  );
-}
-
 class MinimaxScreen extends StatefulWidget {
+  const MinimaxScreen({super.key});
   @override
   _MinimaxScreenState createState() => _MinimaxScreenState();
 }
 
 class _MinimaxScreenState extends State<MinimaxScreen> {
-  // Ma trận 3x3
-  List<List<String>> grid = List.generate(
-    3,
-    (_) => List.generate(3, (_) => ''),
-  );
-
-  // Vị trí Pacman, Ghost và cánh cửa
-  int pacmanX = 0, pacmanY = 0;
-  int ghostX = 0, ghostY = 1;
-  int doorX = 1, doorY = 1;
-
+  late GameState game;
   bool isRunning = false;
-
-  // Danh sách lưu log các bước di chuyển
-  List<String> logs = [];
-
-  // Bộ nhớ cache để lưu trạng thái đã duyệt
-  Set<String> visitedStates = {};
 
   @override
   void initState() {
     super.initState();
-    _initializeGrid();
+    game = GameState(onGameEnd: _showDialog);
   }
 
-  void _initializeGrid() {
-    setState(() {
-      grid = List.generate(3, (_) => List.generate(3, (_) => ''));
-      grid[pacmanX][pacmanY] = 'P'; // Pacman
-      grid[ghostX][ghostY] = 'G'; // Ghost
-      grid[doorX][doorY] = 'D'; // Door
-
-      // Xóa log
-      logs.clear();
-      logs.add('Trò chơi bắt đầu!');
-      visitedStates.clear();
-    });
+  void _showDialog(String message) {
+    setState(() => isRunning = false);
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: Text('Kết quả'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() => game.reset());
+                },
+                child: Text('Chơi lại'),
+              ),
+            ],
+          ),
+    );
   }
 
-  // Hàm di chuyển Pacman
-  void _movePacman() {
-    var bestMove = _minimax(pacmanX, pacmanY, true, 5); // Giới hạn độ sâu là 5
-    setState(() {
-      grid[pacmanX][pacmanY] = '';
-      pacmanX = bestMove['x']!;
-      pacmanY = bestMove['y']!;
-      grid[pacmanX][pacmanY] = 'P';
+  void _runGame() async {
+    setState(() => isRunning = true);
 
-      // Thêm log cho bước di chuyển của Pacman
-      logs.add('Pacman di chuyển đến ($pacmanX, $pacmanY)');
-    });
+    while (isRunning) {
+      await Future.delayed(Duration(seconds: 1));
+      setState(() => game.movePacman());
+      if (!isRunning) break;
 
-    // Kiểm tra điều kiện thắng/thua
-    if (pacmanX == doorX && pacmanY == doorY) {
-      logs.add('Pacman thắng! Pacman đã đến cửa.');
-      _showDialog('Pacman thắng! Pacman đã đến cửa.');
-      return;
-    } else if (pacmanX == ghostX && pacmanY == ghostY) {
-      logs.add('Ghost thắng! Ghost đã bắt được Pacman.');
-      _showDialog('Ghost thắng! Ghost đã bắt được Pacman.');
-      return;
-    }
-
-    // Sau khi Pacman di chuyển, Ghost sẽ di chuyển
-    _moveGhost();
-  }
-
-  // Hàm di chuyển Ghost
-  void _moveGhost() {
-    var bestMove = _minimax(ghostX, ghostY, false, 5); // Giới hạn độ sâu là 5
-    setState(() {
-      grid[ghostX][ghostY] = '';
-      ghostX = bestMove['x']!;
-      ghostY = bestMove['y']!;
-      grid[ghostX][ghostY] = 'G';
-
-      // Thêm log cho bước di chuyển của Ghost
-      logs.add('Ghost di chuyển đến ($ghostX, $ghostY)');
-    });
-
-    // Kiểm tra điều kiện thắng/thua
-    if (ghostX == pacmanX && ghostY == pacmanY) {
-      logs.add('Ghost thắng! Ghost đã bắt được Pacman.');
-      _showDialog('Ghost thắng! Ghost đã bắt được Pacman.');
-      return;
-    } else if (ghostX == doorX && ghostY == doorY) {
-      logs.add('Ghost thắng! Ghost đã đến cửa trước.');
-      _showDialog('Ghost thắng! Ghost đã đến cửa trước.');
-      return;
+      await Future.delayed(Duration(seconds: 1));
+      setState(() => game.moveGhost());
+      if (!isRunning) break;
     }
   }
 
-  // ...existing code...
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Minimax - Pacman vs Ghost')),
+      body: Column(
+        children: [
+          Expanded(
+            flex: 3,
+            child: GridView.builder(
+              itemCount: 9,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+              ),
+              itemBuilder: (context, index) {
+                int x = index ~/ 3, y = index % 3;
+                String value = game.grid[x][y];
+                Color color =
+                    {
+                      'P': Colors.yellow,
+                      'G': Colors.red,
+                      'D': Colors.green,
+                    }[value] ??
+                    Colors.grey[300]!;
+                return Container(
+                  margin: EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: color, border: Border.all()),
+                  child: Center(
+                    child: Text(value, style: TextStyle(fontSize: 24)),
+                  ),
+                );
+              },
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: ListView.builder(
+              itemCount: game.logs.length,
+              padding: EdgeInsets.all(8),
+              itemBuilder:
+                  (_, i) => Card(
+                    margin: EdgeInsets.symmetric(vertical: 4),
+                    child: Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text(game.logs[i], style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(8),
+            child: ElevatedButton(
+              onPressed: isRunning ? null : _runGame,
+              child: Text('Chạy thuật toán'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-  // Thuật toán Minimax
+class GameState {
+  final Function(String) onGameEnd;
+  List<List<String>> grid = List.generate(
+    3,
+    (_) => List.generate(3, (_) => ''),
+  );
+  int pacX = 0, pacY = 0;
+  int ghostX = 0, ghostY = 1;
+  final int doorX = 1, doorY = 1;
+  List<String> logs = [];
+  Set<String> visited = {};
+
+  GameState({required this.onGameEnd}) {
+    reset();
+  }
+
+  void reset() {
+    grid = List.generate(3, (_) => List.generate(3, (_) => ''));
+    pacX = 0;
+    pacY = 0;
+    ghostX = 0;
+    ghostY = 1;
+    grid[pacX][pacY] = 'P';
+    grid[ghostX][ghostY] = 'G';
+    grid[doorX][doorY] = 'D';
+    logs.clear();
+    visited.clear();
+    logs.add('Trò chơi bắt đầu!');
+  }
+
+  void movePacman() {
+    final move = _minimax(pacX, pacY, true, 5);
+    grid[pacX][pacY] = '';
+    pacX = move['x']!;
+    pacY = move['y']!;
+    grid[pacX][pacY] = 'P';
+    logs.add('Pacman đến ($pacX, $pacY)');
+
+    if (_checkEnd()) return;
+  }
+
+  void moveGhost() {
+    final move = _minimax(ghostX, ghostY, false, 5);
+    grid[ghostX][ghostY] = '';
+    ghostX = move['x']!;
+    ghostY = move['y']!;
+    grid[ghostX][ghostY] = 'G';
+    logs.add('Ghost đến ($ghostX, $ghostY)');
+
+    _checkEnd();
+  }
+
+  bool _checkEnd() {
+    if (pacX == doorX && pacY == doorY) {
+      logs.add('Pacman thắng!');
+      onGameEnd('Pacman thắng!');
+      return true;
+    }
+    if ((pacX == ghostX && pacY == ghostY) ||
+        (ghostX == doorX && ghostY == doorY)) {
+      logs.add('Ghost thắng!');
+      onGameEnd('Ghost thắng!');
+      return true;
+    }
+    return false;
+  }
+
   Map<String, int> _minimax(int x, int y, bool isPacman, int depth) {
-    // Điều kiện dừng: Độ sâu tối đa
-    if (depth == 0) {
-      return {'score': 0, 'x': x, 'y': y};
-    }
-
-    // Điều kiện dừng: Trạng thái kết thúc
-    if (x == pacmanX && y == pacmanY && !isPacman) {
-      return {'score': 1, 'x': x, 'y': y}; // Ghost ăn Pacman
-    }
-    if (x == doorX && y == doorY) {
+    if (depth == 0) return {'score': 0, 'x': x, 'y': y};
+    if (x == pacX && y == pacY && !isPacman)
+      return {'score': 1, 'x': x, 'y': y};
+    if (x == doorX && y == doorY)
       return {'score': isPacman ? 1 : -1, 'x': x, 'y': y};
-    }
 
-    // Tránh trùng lặp trạng thái
-    String stateKey = '$pacmanX,$pacmanY,$ghostX,$ghostY';
-    if (visitedStates.contains(stateKey)) {
-      // Nếu trạng thái đã được duyệt, trả về điểm hòa
-      logs.add('Trạng thái đã được duyệt: $stateKey');
-      _showDialog('Thuật toán dừng lại do trạng thái trùng lặp!');
-      setState(() {
-        isRunning = false;
-      });
+    final stateKey = '$pacX,$pacY,$ghostX,$ghostY';
+    if (visited.contains(stateKey)) {
+      logs.add('Trạng thái lặp lại: $stateKey');
+      onGameEnd('Thuật toán dừng: trạng thái lặp lại');
       return {'score': 0, 'x': x, 'y': y};
     }
-    visitedStates.add(stateKey);
+    visited.add(stateKey);
 
-    // Tìm tất cả các nước đi hợp lệ (chỉ lên, xuống, trái, phải)
+    final directions = [
+      {'dx': -1, 'dy': 0},
+      {'dx': 1, 'dy': 0},
+      {'dx': 0, 'dy': -1},
+      {'dx': 0, 'dy': 1},
+    ];
+
     List<Map<String, int>> moves = [];
-    for (var direction in [
-      {'dx': -1, 'dy': 0}, // Lên
-      {'dx': 1, 'dy': 0}, // Xuống
-      {'dx': 0, 'dy': -1}, // Trái
-      {'dx': 0, 'dy': 1}, // Phải
-    ]) {
-      int newX = x + direction['dx']!;
-      int newY = y + direction['dy']!;
-      if (newX >= 0 && newX < 3 && newY >= 0 && newY < 3) {
-        // Pacman chỉ được di chuyển vào ô trống
-        if (isPacman && grid[newX][newY] == '') {
-          moves.add({'x': newX, 'y': newY});
-        }
-        // Ghost có thể di chuyển vào bất kỳ ô nào (bao gồm cả ô của Pacman)
-        if (!isPacman) {
-          moves.add({'x': newX, 'y': newY});
-        }
+    for (var dir in directions) {
+      int nx = x + dir['dx']!, ny = y + dir['dy']!;
+      if (nx >= 0 && nx < 3 && ny >= 0 && ny < 3) {
+        if (isPacman && grid[nx][ny] == '') moves.add({'x': nx, 'y': ny});
+        if (!isPacman) moves.add({'x': nx, 'y': ny});
       }
     }
 
-    // Nếu không còn nước đi, trả về điểm hòa
-    if (moves.isEmpty) {
-      return {'score': 0, 'x': x, 'y': y};
-    }
+    if (moves.isEmpty) return {'score': 0, 'x': x, 'y': y};
 
-    // Tính điểm cho từng nước đi
-    Map<String, int>? bestMove;
     int bestScore = isPacman ? -999 : 999;
+    Map<String, int> bestMove = moves.first;
 
     for (var move in moves) {
-      int newX = move['x']!;
-      int newY = move['y']!;
-
-      // Giả lập nước đi
-      int oldPacmanX = pacmanX, oldPacmanY = pacmanY;
-      int oldGhostX = ghostX, oldGhostY = ghostY;
+      int oldPX = pacX, oldPY = pacY;
+      int oldGX = ghostX, oldGY = ghostY;
 
       if (isPacman) {
-        pacmanX = newX;
-        pacmanY = newY;
+        pacX = move['x']!;
+        pacY = move['y']!;
       } else {
-        ghostX = newX;
-        ghostY = newY;
+        ghostX = move['x']!;
+        ghostY = move['y']!;
       }
 
-      // Đệ quy Minimax
-      var result = _minimax(pacmanX, pacmanY, !isPacman, depth - 1);
+      var result = _minimax(pacX, pacY, !isPacman, depth - 1);
 
-      // Hoàn tác nước đi
-      pacmanX = oldPacmanX;
-      pacmanY = oldPacmanY;
-      ghostX = oldGhostX;
-      ghostY = oldGhostY;
+      pacX = oldPX;
+      pacY = oldPY;
+      ghostX = oldGX;
+      ghostY = oldGY;
 
-      // Cập nhật nước đi tốt nhất
       if (isPacman && result['score']! > bestScore) {
         bestScore = result['score']!;
         bestMove = move;
@@ -205,130 +244,6 @@ class _MinimaxScreenState extends State<MinimaxScreen> {
       }
     }
 
-    return {'score': bestScore, 'x': bestMove!['x']!, 'y': bestMove['y']!};
-  }
-
-  // ...existing code...
-
-  // Hiển thị thông báo kết quả
-  void _showDialog(String message) {
-    setState(() {
-      isRunning = false;
-    });
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Kết quả'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _initializeGrid();
-                },
-                child: Text('Chơi lại'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Chạy thuật toán tự động
-  void _runAlgorithm() async {
-    setState(() {
-      isRunning = true;
-    });
-
-    while (isRunning) {
-      // Pacman di chuyển trước
-      await Future.delayed(Duration(seconds: 1));
-      _movePacman();
-
-      // Kiểm tra nếu trò chơi đã kết thúc sau khi Pacman di chuyển
-      if (!isRunning) break;
-
-      // Ghost di chuyển sau
-      await Future.delayed(Duration(seconds: 1));
-      _moveGhost();
-
-      // Kiểm tra nếu trò chơi đã kết thúc sau khi Ghost di chuyển
-      if (!isRunning) break;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Minimax Algorithm - Pacman vs Ghost')),
-      body: Column(
-        children: [
-          // Hiển thị ma trận 3x3
-          Expanded(
-            flex: 3,
-            child: GridView.builder(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-              ),
-              itemCount: 9,
-              itemBuilder: (context, index) {
-                int x = index ~/ 3;
-                int y = index % 3;
-                return Container(
-                  margin: EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color:
-                        grid[x][y] == 'P'
-                            ? Colors.yellow
-                            : grid[x][y] == 'G'
-                            ? Colors.red
-                            : grid[x][y] == 'D'
-                            ? Colors.green
-                            : Colors.grey[300],
-                    border: Border.all(color: Colors.black),
-                  ),
-                  child: Center(
-                    child: Text(
-                      grid[x][y],
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Hiển thị log
-          Expanded(
-            flex: 2,
-            child: ListView.builder(
-              padding: EdgeInsets.all(8),
-              itemCount: logs.length,
-              itemBuilder: (context, index) {
-                return Card(
-                  margin: EdgeInsets.symmetric(vertical: 4),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(logs[index], style: TextStyle(fontSize: 16)),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Nút chạy thuật toán
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: isRunning ? null : _runAlgorithm,
-              child: Text('Chạy thuật toán'),
-            ),
-          ),
-        ],
-      ),
-    );
+    return {'score': bestScore, 'x': bestMove['x']!, 'y': bestMove['y']!};
   }
 }

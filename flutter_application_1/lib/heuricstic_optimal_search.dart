@@ -5,20 +5,32 @@ import 'package:flutter_application_1/hill_climbing.dart';
 import 'package:flutter_application_1/a_star.dart';
 import 'package:flutter_application_1/branch_and_bound.dart';
 
+enum SearchAlgorithm { bestFirst, hillClimbing, aStar, branchAndBound }
+
+extension AlgoName on SearchAlgorithm {
+  String get label {
+    switch (this) {
+      case SearchAlgorithm.bestFirst:
+        return 'Best-First Search';
+      case SearchAlgorithm.hillClimbing:
+        return 'Hill Climbing';
+      case SearchAlgorithm.aStar:
+        return 'A* Search';
+      case SearchAlgorithm.branchAndBound:
+        return 'Branch and Bound';
+    }
+  }
+}
+
 class GraphSearchScreen extends StatefulWidget {
+  const GraphSearchScreen({super.key});
   @override
   _GraphSearchScreenState createState() => _GraphSearchScreenState();
 }
 
 class _GraphSearchScreenState extends State<GraphSearchScreen> {
-  dynamic graph;
-  List<String> logs = [];
-  List<int> path = [];
-
   final int nodeCount = 14;
-  int startNode = 0;
-  int endNode = 10;
-
+  final List<int> heuristic = [10, 9, 7, 8, 6, 5, 4, 3, 2, 1, 0, 2, 3, 4];
   final edges = [
     [0, 1, 3],
     [0, 2, 6],
@@ -35,57 +47,13 @@ class _GraphSearchScreenState extends State<GraphSearchScreen> {
     [9, 13, 2],
   ];
 
-  final List<int> heuristic = [10, 9, 7, 8, 6, 5, 4, 3, 2, 1, 0, 2, 3, 4];
+  int startNode = 0;
+  int endNode = 10;
+  SearchAlgorithm selectedAlgo = SearchAlgorithm.bestFirst;
 
-  String selectedAlgo = 'Best-First Search';
-  final List<String> algoOptions = [
-    'Best-First Search',
-    'Hill Climbing',
-    'A* Search',
-    'Branch and Bound',
-  ];
-
-  void runAlgorithm() {
-    if (selectedAlgo == 'Best-First Search') {
-      graph = BestFirstGraph(nodeCount, edges);
-      path = graph.bestFirstSearch(startNode, endNode);
-    } else if (selectedAlgo == 'Hill Climbing') {
-      graph = HillClimbingGraph(nodeCount, edges);
-      path = graph.hillClimbing(startNode, endNode);
-    } else if (selectedAlgo == 'A* Search') {
-      graph = AStarGraph(nodeCount, edges, heuristic, 1);
-      path = graph.aStarSearch(startNode, endNode);
-    } else if (selectedAlgo == 'Branch and Bound') {
-      graph = BranchAndBoundGraph(nodeCount, edges);
-      path = graph.branchAndBound(startNode, endNode);
-    }
-    print("Selected Algorithm: $selectedAlgo");
-    print("Start Node: $startNode, End Node: $endNode");
-    print("Path: $path");
-
-    // Kiểm tra kiểu dữ liệu của steps và xử lý tương ứng
-    print("Steps type: ${graph.steps.runtimeType}");
-    print("Steps content: ${graph.steps}");
-
-    if (graph.steps is List<String>) {
-      logs = List<String>.from(graph.steps);
-    } else if (graph.steps is List<StepLog>) {
-      logs = graph.steps.map((step) => step.toString()).toList();
-    } else if (graph.steps is List<dynamic>) {
-      logs = graph.steps.map((step) => step.toString()).toList();
-    } else {
-      logs = [];
-    }
-
-    setState(() {});
-  }
-
-  List<DropdownMenuItem<int>> buildDropdownItems() {
-    return List.generate(
-      nodeCount,
-      (i) => DropdownMenuItem(value: i, child: Text('Đỉnh $i')),
-    );
-  }
+  List<String> logs = [];
+  List<int> path = [];
+  dynamic graph;
 
   @override
   void initState() {
@@ -93,81 +61,64 @@ class _GraphSearchScreenState extends State<GraphSearchScreen> {
     runAlgorithm();
   }
 
+  void runAlgorithm() {
+    switch (selectedAlgo) {
+      case SearchAlgorithm.bestFirst:
+        graph = BestFirstGraph(nodeCount, edges);
+        path = graph.bestFirstSearch(startNode, endNode);
+        break;
+      case SearchAlgorithm.hillClimbing:
+        graph = HillClimbingGraph(nodeCount, edges);
+        path = graph.hillClimbing(startNode, endNode);
+        break;
+      case SearchAlgorithm.aStar:
+        graph = AStarGraph(nodeCount, edges, heuristic, 1);
+        path = graph.aStarSearch(startNode, endNode);
+        break;
+      case SearchAlgorithm.branchAndBound:
+        graph = BranchAndBoundGraph(nodeCount, edges);
+        path = graph.branchAndBound(startNode, endNode);
+        break;
+    }
+
+    logs = (graph.steps as List).map((e) => e.toString()).toList();
+    setState(() {});
+  }
+
+  List<DropdownMenuItem<int>> get nodeItems => List.generate(
+    nodeCount,
+    (i) => DropdownMenuItem(value: i, child: Text('Đỉnh $i')),
+  );
+
+  List<DropdownMenuItem<SearchAlgorithm>> get algoItems =>
+      SearchAlgorithm.values
+          .map((algo) => DropdownMenuItem(value: algo, child: Text(algo.label)))
+          .toList();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Best-First Search & Hill Climbing')),
+      appBar: AppBar(title: Text('Tìm kiếm trên đồ thị')),
       body: Column(
         children: [
-          // Chọn đỉnh + thuật toán
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<int>(
-                    value: startNode,
-                    items: buildDropdownItems(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => startNode = val);
-                    },
-                    decoration: InputDecoration(labelText: 'Bắt đầu'),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<int>(
-                    value: endNode,
-                    items: buildDropdownItems(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => endNode = val);
-                    },
-                    decoration: InputDecoration(labelText: 'Kết thúc'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: DropdownButtonFormField<String>(
-              value: selectedAlgo,
-              items:
-                  algoOptions
-                      .map(
-                        (algo) =>
-                            DropdownMenuItem(value: algo, child: Text(algo)),
-                      )
-                      .toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => selectedAlgo = val);
-              },
-              decoration: InputDecoration(labelText: 'Thuật toán'),
-            ),
-          ),
-          SizedBox(height: 12),
+          _buildControls(),
           ElevatedButton(onPressed: runAlgorithm, child: Text("Chạy")),
           Divider(),
-
-          // Vẽ đồ thị
           Expanded(
             flex: 2,
-            child: Container(
-              padding: EdgeInsets.all(12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
               child: CustomPaint(
                 painter: GraphPainter(graph: graph, path: path),
                 child: Container(),
               ),
             ),
           ),
-
-          // Log các bước
           Expanded(
             flex: 3,
             child: ListView.builder(
-              padding: EdgeInsets.all(8),
               itemCount: logs.length,
+              padding: EdgeInsets.all(8),
               itemBuilder:
                   (context, index) => Card(
                     margin: EdgeInsets.symmetric(vertical: 6),
@@ -182,14 +133,50 @@ class _GraphSearchScreenState extends State<GraphSearchScreen> {
             ),
           ),
           Divider(),
-
-          // Hiển thị đường đi
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(
               'Đường đi: ${path.join(" -> ")}',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: startNode,
+                  items: nodeItems,
+                  onChanged: (val) => setState(() => startNode = val ?? 0),
+                  decoration: InputDecoration(labelText: 'Bắt đầu'),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: endNode,
+                  items: nodeItems,
+                  onChanged: (val) => setState(() => endNode = val ?? 0),
+                  decoration: InputDecoration(labelText: 'Kết thúc'),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          DropdownButtonFormField<SearchAlgorithm>(
+            value: selectedAlgo,
+            items: algoItems,
+            onChanged: (val) => setState(() => selectedAlgo = val!),
+            decoration: InputDecoration(labelText: 'Thuật toán'),
           ),
         ],
       ),

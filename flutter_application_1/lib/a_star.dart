@@ -3,7 +3,6 @@ import 'package:collection/collection.dart';
 class Neighbor {
   final int to;
   final int cost;
-
   Neighbor(this.to, this.cost);
 }
 
@@ -29,82 +28,96 @@ class AStarNode {
 }
 
 class AStarGraph {
-  final int n;
-  final List<List<Neighbor>> adj;
+  final int size;
+  final List<List<Neighbor>> adjacencyList;
   final List<int> heuristic;
-  List<bool> visited;
-  List<int> path;
-  int step;
-  List<StepLog> steps = [];
-  PriorityQueue<AStarNode> pq;
 
-  AStarGraph(this.n, List<List<int>> edges, this.heuristic, this.step)
-    : assert(heuristic.length == n, 'Heuristic phải có độ dài bằng số đỉnh'),
-      adj = List.generate(n, (_) => []),
-      visited = List.filled(n, false),
-      path = [],
-      steps = [],
-      pq = PriorityQueue<AStarNode>((a, b) => a.fCost.compareTo(b.fCost)) {
-    // Xây dựng đồ thị từ danh sách các cạnh
+  late List<bool> visited;
+  late List<int> path;
+  late int step;
+  late List<StepLog> steps;
+  late PriorityQueue<AStarNode> openSet;
+  late List<int?> parent;
+
+  AStarGraph(this.size, List<List<int>> edges, this.heuristic, int initialStep)
+    : assert(heuristic.length == size, 'Heuristic phải có độ dài bằng số đỉnh'),
+      adjacencyList = List.generate(size, (_) => []) {
     for (var edge in edges) {
-      int u = edge[0], v = edge[1], cost = edge[2];
-      adj[u].add(Neighbor(v, cost));
-      adj[v].add(Neighbor(u, cost));
+      final u = edge[0], v = edge[1], cost = edge[2];
+      adjacencyList[u].add(Neighbor(v, cost));
+      adjacencyList[v].add(Neighbor(u, cost));
     }
+    step = initialStep;
+    _initializeSearchState();
+  }
+
+  void _initializeSearchState() {
+    visited = List.filled(size, false);
+    path = [];
+    steps = [];
+    openSet = PriorityQueue(
+      (AStarNode a, AStarNode b) => a.fCost.compareTo(b.fCost),
+    );
+    parent = List.filled(size, null); // Khởi tạo parent
   }
 
   void reset() {
-    path.clear();
-    visited = List.filled(n, false);
-    step = 1;
-    pq.clear();
-    steps.clear(); // Xóa danh sách các bước
+    _initializeSearchState();
   }
 
-  List<int> aStarSearch(int src, int target) {
+  List<int> aStarSearch(int start, int goal) {
     reset();
-    pq.add(
-      AStarNode(heuristic[src], 0, src),
-    ); // f_cost = heuristic[src], g_cost = 0
-    visited[src] = true;
+    openSet.add(AStarNode(heuristic[start], 0, start));
+    visited[start] = true;
 
-    while (pq.isNotEmpty) {
-      var current = pq.removeFirst();
-      int fCost = current.fCost, gCost = current.gCost, node = current.node;
+    while (openSet.isNotEmpty) {
+      final current = openSet.removeFirst();
+      final node = current.node, gCost = current.gCost, fCost = current.fCost;
       path.add(node);
 
-      String log = "--- Bước $step ---\n";
-      log += "Đang xét đỉnh: $node (g_cost: $gCost, f_cost: $fCost)\n";
+      var logMessage = "--- Bước $step ---\n";
+      logMessage += "Đang xét đỉnh: $node (g: $gCost, f: $fCost)\n";
 
-      if (node == target) {
-        log += "Đã đến đích!";
-        steps.add(StepLog(step, log)); // Thêm log dưới dạng StepLog
+      if (node == goal) {
+        logMessage += "Đã đến đích!";
+        steps.add(StepLog(step++, logMessage));
         break;
       }
 
-      log += "Các đỉnh kề (chưa duyệt):\n";
-      for (var neighbor in adj[node]) {
-        int newGCost = gCost + neighbor.cost;
-        int newFCost = newGCost + heuristic[neighbor.to];
+      logMessage += "Các đỉnh kề (chưa duyệt):\n";
+      for (var neighbor in adjacencyList[node]) {
+        final nextNode = neighbor.to;
+        final edgeCost = neighbor.cost;
+        final nextG = gCost + edgeCost;
+        final nextF = nextG + heuristic[nextNode];
 
-        if (!visited[neighbor.to]) {
-          pq.add(AStarNode(newFCost, newGCost, neighbor.to));
-          log +=
-              "  - Đỉnh ${neighbor.to} với chi phí cạnh = ${neighbor.cost}, g_cost = $newGCost, f_cost = $newFCost\n";
+        if (!visited[nextNode]) {
+          openSet.add(AStarNode(nextF, nextG, nextNode));
+          parent[nextNode] = node; // Lưu lại parent của nextNode
+          logMessage +=
+              "  - Đỉnh $nextNode, cạnh: $edgeCost, g: $nextG, f: $nextF\n";
         }
       }
 
-      visited[node] = true; // Đánh dấu sau khi xử lý xong
+      visited[node] = true;
 
-      var openListSorted =
-          pq.toList()..sort((a, b) => a.fCost.compareTo(b.fCost));
-      log += "Danh sách mở: $openListSorted\n";
-      steps.add(StepLog(step, log)); // Thêm log dưới dạng StepLog
-      step++;
+      final openListPreview =
+          openSet.toList()..sort((a, b) => a.fCost.compareTo(b.fCost));
+      logMessage += "Danh sách mở: $openListPreview\n";
+      steps.add(StepLog(step++, logMessage));
     }
 
-    if (path.isEmpty || path.last != target) {
-      steps.add(StepLog(step, "Không tìm thấy đường đi từ $src đến $target."));
+    if (path.isEmpty || path.last != goal) {
+      steps.add(StepLog(step, "Không tìm thấy đường đi từ $start đến $goal."));
+    } else {
+      // Truy vết đường đi từ goal về start thông qua parent
+      int? current = goal; // Thay đổi kiểu của current thành int?
+      List<int> fullPath = [];
+      while (current != null) {
+        fullPath.add(current);
+        current = parent[current];
+      }
+      path = fullPath.reversed.toList(); // Đảo ngược đường đi từ start -> goal
     }
 
     return path;
