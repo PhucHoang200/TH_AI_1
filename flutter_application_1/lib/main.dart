@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/heuricstic_optimal_search.dart';
-// import 'package:flutter_application_1/minimax_screen.dart';
+import 'package:flutter_application_1/minimax_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Graph Search Algorithms',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: GraphSearchScreen(),
+      home: MinimaxScreen(),
     );
   }
 }
